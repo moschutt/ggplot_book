@@ -1,0 +1,465 @@
+---
+title: "ggplot2 - Examples and Excersizes"
+output: html_notebook
+---
+
+This is a notebook of the examples and excersizes from "ggplot2 Elegant Graphics for Data Analysis"
+
+```{r}
+library(tidyverse)
+library(gridExtra)
+```
+# Chapter 3
+
+Excersizes and examples from Chapter 3.
+
+Basich carts.
+
+I used the [gridextra](https://cran.r-project.org/web/packages/gridExtra/index.html) package to plot multiple charts in a single window.
+
+## Example from P51
+
+```{r}
+data.frame(
+  x=c(3, 1, 5),
+  y=c(2, 4, 6),
+  label=c('a', 'b', 'c')) -> df
+
+ggplot(df,
+       aes(x, y, label=label)) +
+  labs(x=NULL, y=NULL) + # Hides x and y axis
+  theme(plot.title=element_text(size=12)) -> p  # Shrink plot title
+```
+```{r}
+gridExtra::grid.arrange(p+geom_point() + ggtitle("point"), 
+                        p + geom_text() + ggtitle("text"),
+                        p + geom_bar(stat='identity') + ggtitle('bar'),
+                        p + geom_tile() + ggtitle('raster'),
+                        ncol=2)
+```
+```{r}
+gridExtra::grid.arrange(p + geom_line() + ggtitle('line'),
+                        p + geom_area() + ggtitle('area'),
+                        p + geom_path() + ggtitle('path'),
+                        p + geom_polygon() + ggtitle('polygon'),
+                        ncol=2)
+```
+```{r}
+gridExtra::grid.arrange(p + geom_dotplot() + ggtitle('dot'),
+                        p + geom_rug() + ggtitle('rug'),
+                        ncol=2)
+```
+
+## 3.3 Labels
+
+Adding text to the plot.
+
+Fonts are handled differently by different platforms and output types.  there are 2 packages which attempt to address this:
+
+* [showtext](https://github.com/yixuan/showtext) by Yixuan Qiu
+* [extrafont](htts://github.com/wch/extrafont) by Winston Chang
+
+```{r}
+data.frame(x=1, 
+           y=3:1,
+           family=c('sans', 'serif', 'mono')) -> df
+ggplot(df, 
+       aes(x=x, y=y)) +
+  geom_text(aes(label=family,
+                family=family)) -> p
+```
+
+Print the plot
+
+```{r}
+print(p)
+```
+
+## face example
+
+```{r}
+data.frame(x=1,
+           y=3:1,
+           face=c('plain', 'bold', 'italic')) -> df
+ggplot(df, 
+       aes(x=x, y=y)) +
+  geom_text(aes(label=face,
+                fontface=face))
+```
+
+## Alignment
+
+```{r}
+data.frame(
+  x=c(1,1,2,2,1.5),
+  y=c(1,2,1,2,1.5),
+  text=c('bottom-left', 'bottom-right',
+         'top-left', 'top-right', 'center')) -> df
+
+ggplot(df,
+       aes(x, y)) +
+  geom_text(aes(label=text)) -> p1
+
+ggplot(df,
+       aes(x, y)) +
+  geom_text(aes(label=text),
+            vjust='inward',
+            hjust='inward') -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+## size
+
+ggplot2 uses mm for sizes.
+
+There are 72.27 pts / inch so to convert from pts to mm multiply by (72.27 / 25.4).
+
+plot the points, create a text label for each from the resp variable.  The second plot "nudges" down the text bo 0.25 mm.
+
+The option to geom_text() **check_overlap** will check and remove overlapping text.  It simply uses only the first text that fills a space and does not display later text.  this can be handy when there are a lot of text values to clear things up a bit, but you can loose a lot of text.
+
+```{r}
+data.frame(
+  trt=c('a', 'b', 'c'),
+  resp=c(1.2, 3.4, 2.5)) -> df
+
+ggplot(df,
+       aes(x=resp, y=trt)) +
+  geom_point() +
+  geom_text(aes(label=paste0('(', resp, ')'))) + 
+  xlim(1, 3.6) -> p1
+
+ggplot(df,
+       aes(x=resp, y=trt)) +
+  geom_point() +
+  geom_text(aes(label=paste0('(', resp, ')')),
+            nudge_y=-0.25) + 
+  xlim(1, 3.6) -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+## geom_lable()
+
+geom_label() is just like geom_text() but draws a rounded rectangle around the text with a sold background.  This can be handy when the background is busy, which, if you are following Tufte's guideliens, it will not be.
+
+```{r}
+data.frame(
+  waiting=c(55, 80),
+  eruptions=c(2,4.3),
+  label=c('peak one', 'peak two')) -> label
+
+ggplot(faithfuld,
+       aes(waiting, eruptions)) +
+  geom_tile(aes(fill=density)) +
+  geom_label(data=label,
+             aes(label=label)) -> p1
+
+p1
+```
+
+## directlabels
+
+[directlabels](https://github.com/tdhock/directlabels) is a package to plot labels directly on a plot "near" the data points they represent.
+
+For more see the directlabels website http://directlabels.r-forge.r-projgect.org.
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=hwy, colour=class)) -> p
+
+p + geom_point() -> p1
+p + geom_point(show.legend=FALSE) +
+  directlabels::geom_dl(aes(label=class),
+                        method='smart.grid') -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+
+```
+
+## 3.4 Annotations
+
+Annotations can be text, lines, colors, etc.  Anything to add additional meta data to a chart.
+
+The folowing example shows unemployment data in use and adds information about what presedent was in office at the time.
+
+```{r}
+subset(presidential, start > economics$date[1]) -> pres
+
+ggplot(economics) +
+  geom_rect(
+    aes(xmin=start,
+        xmax=end,
+        fill=party),
+    ymin=-Inf, ymax=Inf, alpha=0.2,
+    data=pres) +
+  geom_line(aes(x=date, y=unemploy)) +
+  scale_fill_manual(values=c('blue', 'red')) -> p1
+
+p1 + geom_vline(
+  aes(xintercept=as.numeric(start)),
+  data=pres,
+  colour='grey50',
+  alpha=0.5) -> p2
+
+p2 + geom_text(
+  aes(x=start, y=2500, label=name),
+  data=pres,
+  size=3, vjust=0, hjust=0, nudge_x=50) -> p3
+
+p2 + geom_text(
+  aes(x=start, y=0, label=name),
+  data=pres,
+  size=3, vjust=0, hjust=0, nudge_x=50) -> p4
+
+gridExtra::grid.table(pres)
+gridExtra::grid.arrange(p1, p2, p3, p4, ncol=1)
+```
+
+# 3.5 Collective geoms
+
+```{r}
+data(Oxboys, package='nlme')
+head(Oxboys)
+```
+
+Use **group** to group varaibles by a factor.  If there are multiple factors the data is grouped by, then include all the factors in the **interaction()** function, i.e. `aes(x=x, y=y, group=interaction(f1, f2))`.
+
+```{r}
+ggplot(Oxboys,
+       aes(x=age, y=height, group=Subject)) +
+  geom_point() +
+  geom_line()
+```
+
+## Different groups on different layers
+
+The **geom_smooth()** is applied to the data in the ggplot, since the grouping is applied at that level in the first chart, each group gets a smooth line.  The second chart, the grouping takes place at the **geom_line()** layer so the smoothing is applied to the complete ungrouped dataset and so is what we want.
+
+```{r}
+ggplot(Oxboys,
+       aes(x=age,
+           y=height,
+           group=Subject)) +
+  geom_line() +
+  geom_smooth(method='lm', se=FALSE) -> p1
+
+ggplot(Oxboys,
+       aes(x=age,
+           y=height)) +
+  geom_line(aes(group=Subject)) +
+  geom_smooth(method='lm', se=FALSE) -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+
+## Overriding default grouping
+
+Exmaple of boxplot, which has default grouping along the x axis.
+
+```{r}
+ggplot(Oxboys,
+       aes(x=Occasion, y=height)) +
+  geom_boxplot() -> p1
+
+p1
+```
+
+Let's see what it looks like to trace each boy through the data.  So add a **geom_line()**
+
+```{r}
+p1 + geom_line(colour='blue', 
+               alpha=0.5)
+```
+
+Not what we wanted.  Since the default grouping is by the x values, the lines simply run vertically through the y values.  So we need to override the default grouping.
+
+```{r}
+p1 + geom_line(aes(group=Subject),
+               colour='blue',
+               alpha=0.5)
+
+
+```
+
+## Excersizes
+
+1. Draw a boxplot of hwy for each value of cyl, without turning cyl into a factor.  What extra aesthetic to you need to set?
+
+>> group=cyl is required to get the desired affect.
+
+```{r}
+head(mpg)
+```
+```{r}
+ggplot(mpg,
+       aes(x=cyl, y=hwy, group=cyl)) +
+  geom_boxplot()
+```
+
+2. Modify the following so you get 1 boxplot per integer value of displ.
+
+```
+ggplot(mpg,
+aes(x=displ, y=cty)) +
+geom_boxplot()
+```
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=cty, group=displ)) +
+  geom_boxplot()
+```
+
+3. Why, from the example on discrete colors on a line, did you need to include the **aes(group=1)** for the **geom_line()**?  What happens if it's omitted? What is the difference between **aes(group=1)** and **aes(group=2)**.
+
+Because there is only 1 point per grouping for the lines there is no way to know what color the line segments should be.
+
+Adding the *group=1* provides a default grouping of all the values.  It can be any value, 1, 2, 3, 'spoon'.
+
+```{r}
+data.frame(x=1:3,
+           y=1:3,
+           colour=c(1,3,5)) -> df
+
+ggplot(df,
+       aes(x=x,
+           y=y,
+           colour=factor(colour))) + 
+  geom_line(size=2) +
+  geom_point(size=5) -> p1
+
+ggplot(df,
+       aes(x=x,
+           y=y,
+           colour=factor(colour))) + 
+  geom_line(aes(group=1),
+            size=2) +
+  geom_point(size=5) -> p2
+
+ggplot(df,
+       aes(x=x,
+           y=y,
+           colour=factor(colour))) + 
+  geom_line(aes(group=2),
+            size=2) +
+  geom_point(size=5) -> p3
+
+
+ggplot(df,
+       aes(x=x,
+           y=y,
+           colour=factor(colour))) + 
+  geom_line(aes(group='spoon'),
+            size=2) +
+  geom_point(size=5) -> p4
+
+gridExtra::grid.arrange(p1, p2, p3, p4, ncol=2)
+```
+
+4. How many bars per graph?
+
+The first, 3.  The second, 1 for each distinct hwd value.  For the thrid 1 for each observation.
+
+They are stacked.
+
+```{r}
+unique(mpg$drv)
+```
+```{r}
+ggplot(mpg,
+       aes(x=drv)) + 
+  geom_bar() -> p1
+
+ggplot(mpg,
+       aes(x=drv, fill=hwy, group=hwy, colour='white')) +
+  geom_bar() -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+```{r}
+library(dplyr)
+mpg %>%
+  arrange(hwy) %>%
+  mutate(id=seq_along(hwy)) -> mpg2
+
+head(mpg2)
+```
+```{r}
+ggplot(mpg2,
+       aes(x=drv,
+           fill=hwy,
+           group=id,
+           colour='white')) + 
+  geom_bar()
+```
+
+Install the babynames package.
+
+5. Fix the graph, why is Hadley unhappy?
+
+Hadley is becomming a womans name.
+
+```{r}
+library(babynames)
+
+head(babynames)
+```
+```{r}
+dplyr::filter(babynames,
+              name=="Hadley") -> hadley
+
+hadley
+```
+```{r}
+ggplot(hadley,
+       aes(x=year, y=n)) +
+  geom_line() -> p1
+
+ggplot(hadley,
+       aes(x=year, y=n, colour=sex)) +
+  geom_line() -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+## 3.6 Surface Plots
+
+ggplot2 does not directly support 3d plots but does provide ways of representing 3d data such as contours, colored tiles and buble plots.
+
+For interactve 3d plots see RGL, http://rgl.neoscientists.org/about.shtml.
+
+```{r}
+head(faithfuld)
+```
+
+..level.. used as the factor for the _colour_ aesthetic is a calculated value produced by the geom_contour statistic.
+
+```{r}
+ggplot(faithfuld,
+       aes(x=eruptions, y=waiting)) +
+  geom_contour(aes(z=density, colour=..level..)) -> p1
+
+ggplot(faithfuld,
+       aes(x=eruptions, y=waiting)) +
+  geom_raster(aes(fill=density)) -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+Buble plots work best with smaller datasets.
+
+```{r}
+faithfuld[seq(1, nrow(faithfuld), by=10),] -> small
+
+ggplot(small,
+       aes(x=eruptions, y=waiting)) +
+  geom_point(aes(size=density), 
+             alpha=1/3) + 
+  scale_size_area()
+```
+
+## 3.7 Maps
+
