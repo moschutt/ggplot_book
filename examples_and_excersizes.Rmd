@@ -462,4 +462,317 @@ ggplot(small,
 ```
 
 ## 3.7 Maps
+### Vector boundaries
+
+Vectory boundaries are represented by a data.frame with 1 corner / row and 4 variables / row.
+
+latitude, longitude, group and id.  Group is the overall group, such as Hawaii and id is a distinct area
+with it, such as each individual island.
+
+**NOTE:** Install the maps package: `install.packages('maps')` for this to work.
+
+```{r}
+map_data('county', 'michigan') %>% 
+  select(lon=long, lat, group, id=subregion) -> mi_counties
+
+head(mi_counties)
+```
+
+The **coord_quickmap()** is used to adjust the aspect of the data to take into account the earth is round and degrees of lat closer as one approaches the poles.  Also see the more accurate but compute intensive **coord_map()**.
+
+```{r}
+ggplot(mi_counties,
+       aes(x=lon, y=lat)) +
+  geom_polygon(aes(group=group)) +
+  coord_quickmap() -> p1
+
+ggplot(mi_counties,
+       aes(x=lon, y=lat)) +
+  geom_polygon(aes(group=group),
+               fill=NA,
+               colour='grey50') +
+  coord_quickmap() -> p2
+
+ggplot(mi_counties,
+       aes(x=lon, y=lat)) +
+  geom_polygon(aes(group=group)) -> p3
+
+ggplot(mi_counties,
+       aes(x=lon, y=lat)) +
+  geom_polygon(aes(group=group),
+               fill=NA,
+               colour='grey50') -> p4
+
+gridExtra::grid.arrange(p1, p2, p3, p4, ncol=2)
+```
+
+Much more accurate map data for the U.S. including historic data is available from The USAboudnaries package; https://github.com/ropensci/USAboundaries.  `install.packages('USAboundaries')`
+
+Here is an example of getting at the data and displaying the U.S. as of 1840.
+
+See also the tigris package https://github.com/ walkerke/tigris package.  `install.package('tigris')` and http://naturalearthdata.com/, https://cran.r-project.org/package=osmar.
+
+```{r}
+library(USAboundaries)
+
+us_states('1840-03-12') -> states_1840
+
+data.frame() -> df
+for ( j in 1:length(states_1840@polygons) ) {
+  for ( i in states_1840@polygons[[j]]@plotOrder ) {
+    rbind(df, data.frame(lon=states_1840@polygons[[j]]@Polygons[[i]]@coords[,1],
+                         lat=states_1840@polygons[[j]]@Polygons[[i]]@coords[,2],
+                         group=as.numeric(states_1840@polygons[[j]]@ID),
+                         id=i)) -> df
+  }
+}
+
+ggplot(data=df,
+       aes(x=lon, y=lat)) +
+  geom_polygon(aes(group=interaction(id, group)),
+               fill=NA,
+               colour='grey50') +
+  coord_quickmap() -> p
+
+p
+```
+
+And same map but leveraging the sp library.
+
+```{r}
+fortify(states_1840) -> states_1840df
+
+head(states_1840df)
+```
+```{r}
+ggplot(data=states_1840df,
+       aes(x=long, lat)) +
+  geom_polygon(aes(group=group), colour='grey50', fill=NA) + 
+  coord_quickmap() -> p
+
+p
+```
+
+Shape (.shp) files may be read directly with the maptools::readShapSpacial() function.
+
+
+```{r}
+download.file('http://www2.census.gov/geo/tiger/GENZ2015/shp/cb_2015_us_nation_5m.zip',
+              'cb_2015_us_nation_5m.zip')
+```
+
+Unziped file manually
+
+```{r}
+readShapeSpatial('cb_2015_us_nation_5m.shp') -> ussp
+```
+
+## Point data
+
+City locations are "point data".  These are almost always combined with a background map or they are just points on the screen with no reference.
+
+```{r}
+maps::us.cities %>%
+  tbl_df() %>%
+  filter(country.etc == "MI") %>%
+  select(-country.etc, lon=long) %>%
+  arrange(desc(pop)) -> mi_cities
+
+mi_cities
+```
+
+Graph just the points
+
+```{r}
+ggplot(mi_cities,
+       aes(x=lon, y=lat)) +
+  geom_point(aes(size=pop)) +
+  scale_size_area() +
+  coord_quickmap() -> p1
+
+p1
+```
+
+Now let's do it again but draw the state as well.
+
+```{r}
+ggplot(mi_cities,
+       aes(x=lon, y=lat)) +
+  geom_polygon(aes(x=lon, y=lat, group=group),
+               data=mi_counties,
+               fill=NA,
+               colour='grey50') +
+  geom_point(aes(size=pop), 
+             colour='red',
+             alpha=0.5) +
+  scale_size_area() + 
+  coord_quickmap() -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+## 3.7.3 Raster images
+
+Getting raster images can be slow, cache them if you get them!!!!
+
+```{r}
+library(ggmap)
+
+if ( file.exists('mi_raster.rds') ) {
+  readRDS('mi_raster.rds') -> mi_raster
+} else {
+  c(min(mi_counties$lon), min(mi_counties$lat),
+    max(mi_counties$lon), max(mi_counties$lat)) -> bbox
+  ggmap::get_openstreetmap(bbox,
+                           scale=8735660) -> mi_raster
+  saveRDS(mi_raster, 'mi_raster.rds')
+}
+```
+
+```{r}
+ggmap::ggmap(mi_raster)
+```
+
+```{r}
+ggmap::ggmap(mi_raster) +
+  geom_point(aes(size=pop),
+             data=mi_cities,
+             colour='red',
+             alpha=0.5) + 
+  scale_size_area()
+```
+
+## 3.7.4 Area metadata
+
+
+```{r}
+tbl_df(midwest) %>%
+  filter(state == 'MI') %>%
+  mutate(county=tolower(county)) %>%
+  select(county, area, poptotal, percwhite, percblack) -> mi_census
+
+mi_census
+```
+
+Merge this with the mi_counties data
+
+```{r}
+left_join(mi_census, mi_counties, by=c('county' = 'id')) -> census_counties
+census_counties
+```
+
+```{r}
+ggplot(census_counties,
+       aes(x=lon, y=lat, group=county)) +
+  geom_polygon(aes(fill=poptotal)) +
+  coord_quickmap() -> p1
+
+ggplot(census_counties,
+       aes(x=lon, y=lat, group=county)) +
+  geom_polygon(aes(fill=percwhite)) +
+  coord_quickmap() -> p2
+
+ggplot(mi_counties,
+       aes(x=lon, y=lat)) +
+  geom_polygon(aes(group=group),
+               fill=NA,
+               colour='grey50') +
+  coord_quickmap()-> p3
+
+gridExtra::grid.arrange(p1, p2, p3, ncol=2)
+```
+
+## 3.8 Revealing uncertainty
+
+4 geoms available
+
+* Discrete x, range: geom_errorbar(), geom_linerange()
+* Discrete x, range & cener: geom_crossbar(), geom_pointrange()
+* Continuous x, range: geom_ribbon()
+* Continuous x, range & center: geom_smoth(stat='identiry')
+
+```{r}
+c(18,11,16) -> y
+data.frame(x=1:3,
+           y=y,
+           se=c(1.2, 0.5, 1.0)) -> df
+
+ggplot(df,
+       aes(x=x, y=y, ymin=y-se, ymax=y+se)) +
+  geom_line(colour='red') -> base
+
+base + geom_crossbar() -> p1
+base + geom_pointrange() -> p2
+base + geom_smooth(stat='identity') -> p3
+
+gridExtra::grid.arrange(p1, p2, p3, ncol=3)
+
+```
+
+```{r}
+base + geom_errorbar() -> p1
+base + geom_linerange() -> p2
+base + geom_ribbon(alpha=0.3, colour='grey50') -> p3
+
+gridExtra::grid.arrange(p1, p2, p3, ncol=3)
+```
+
+## 3.9 Weighted data
+
+For lines and points we can use the size aesthetic.
+
+```{r}
+ggplot(midwest,
+       aes(x=percwhite, y=percbelowpoverty)) + 
+  geom_point() -> p1
+
+ggplot(midwest,
+       aes(x=percwhite, y=percbelowpoverty)) +
+  geom_point(aes(size=poptotal / 1e6)) +
+  scale_size_area("Population\n(millions)",
+                 breaks=c(0.5, 1, 2, 4)) -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+Weighting can be passed to summary functions with the weight= parm.  This is not seen in the data directly but affects the smoothing results.
+
+```{r}
+ggplot(midwest,
+        aes(x=percwhite, y=percbelowpoverty)) + 
+  geom_point() + 
+  geom_smooth(method=lm, size=1) -> p1
+
+ggplot(midwest,
+       aes(x=percwhite, y=percbelowpoverty)) +
+  geom_point(aes(size=poptotal/1e6)) +
+  geom_smooth(aes(weight=poptotal), 
+              method=lm,
+              size=1) +
+  scale_size_area(guide='none') -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+Example of the affects of weighting on a histogram.  Note that the weighting changes what is counted  It goes from Counties to Population.
+
+```{r}
+ggplot(midwest,
+       aes(x=percbelowpoverty)) + 
+  geom_histogram(binwidt=1) +
+  ylab("Counties") -> p1
+
+ggplot(midwest,
+       aes(x=percbelowpoverty)) +
+  geom_histogram(aes(weight=poptotal),
+                 binwidth=1) +
+  ylab('Population (1000)s') -> p2
+
+grid.arrange(p1, p2, ncol=2)
+```
+
+## 3.10 Diamonds data
+
+
+
 
