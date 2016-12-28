@@ -1,2 +1,11 @@
 packrat/lib*/
 .Rproj.user
+.cpg
+.dbf
+.prj
+.shp
+.zip
+.html
+.pdf
+.xml
+.Rprofile
