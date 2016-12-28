@@ -1,0 +1,529 @@
+---
+title: "ggplot2 - Chapter 6 Examples and Excersizes"
+output:
+  pdf_document:
+    toc: yes
+  html_notebook: default
+  html_document:
+    theme: united
+    toc: yes
+---
+
+his is a notebook of the examples and excersizes from "ggplot2 Elegant Graphics for Data Analysis"
+
+```{r}
+library(tidyverse)
+library(gridExtra)
+```
+
+# Scales, axes and legends
+
+## Modifying scales
+
+Default scales are applied to every new graph created.  The following 2 charts are identical.
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=hwy)) +
+  geom_point(aes(colour=class)) -> p1
+
+ggplot(mpg,
+       aes(x=displ, y=hwy)) +
+  geom_point(aes(colour=class)) +
+  scale_x_continuous() +
+  scale_y_continuous() +
+  scale_colour_discrete() -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+When you "add" (+) a scale_... you're not really adding it, you're over-riding what has already been set.  So, for instances, to change the axes labels you can over-ride the default (name of variable) as:
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=hwy)) +
+  geom_point(aes(colour=class)) +
+  scale_x_continuous('Really awesome x axis label') +
+  scale_y_continuous('Really awesome y axis label') -> p1
+
+ggplot(mpg,
+       aes(x=displ, y=hwy)) +
+  geom_point(aes(colour=class)) +
+  scale_x_reverse('Really awesome x axis label') +
+  scale_y_continuous('Really awesome y axis label') -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+The naming convention for scales is
+
+scale_<aesthetic>_<scale> where the aesthetic is, well, the aesthetic such as x, y, colour, etc. and <scale> is the scale as in continuous, discrete, brewer, etc.
+
+## Guides: legends and axes
+
+Axes and legends are similar in that they each have 3 related elements.  Axis label and Legend title, Tics and gridlines and key, tick label and key label which are controled by arguments name, breaks and labels respectively.
+
+### Scale title
+
+```{r}
+data.frame(x=1:2, y=1, z='a') -> df
+ggplot(df,
+       aes(x=x, y=y)) +
+  geom_point() -> p
+
+gridExtra::grid.arrange(p+scale_x_continuous('X axis'),
+                        p+scale_x_continuous(quote(a + mathmatical ^ expression)),
+                        ncol=2)
+
+```
+
+Labels are manipulated so much there are 3 special label manipulation functions
+
+* labs()
+* xlab()
+* ylab()
+
+```{r}
+ggplot(df,
+       aes(x=x, y=y)) + 
+  geom_point(aes(colour=z)) -> p
+
+gridExtra::grid.arrange(p+xlab('X axis')+ylab('Y axis'),
+                        p+labs(x='X axis', y='Y axis', colour='Colour\nLegend'),
+                        ncol=2)
+```
+
+### Omitting the legend label
+
+Set the label to "" or NULL.  SEtting to "" allocates space on the chart, NULL does not.
+
+```{r}
+ggplot(df,
+       aes(x=x, y=2)) +
+  geom_point() + 
+  theme(plot.background=element_rect(colour='grey50')) ->p
+
+gridExtra::grid.arrange(p+labs(x="", y=""),
+                        p+labs(x=NULL, y=NULL),
+                        ncol=2)
+```
+
+### Breaks and labels
+
+breaks controls which values appear as tickmarks.  breaks can have labels.  If you specify labels you must specify breaks and keep them in sync otherwise the labels can get out of sync with the breaks.
+
+```{r}
+data.frame(x=c(1,3,5) * 1000, y=1) -> df
+
+ggplot(df,
+       aes(x=x, y=1)) +
+  geom_point() + 
+  labs(x=NULL, y=NULL) -> p
+
+gridExtra::grid.arrange(p,
+                        p+scale_x_continuous(breaks=c(2000, 4000)),
+                        p+scale_x_continuous(breaks=c(2000, 4000), labels=c('2k', '4k')),
+                        ncol=3)
+```
+
+```{r}
+ggplot(df,
+       aes(x=y, y=x, fill=x)) +
+  geom_tile() +
+  labs(x=NULL, y=NULL) -> p
+
+gridExtra::grid.arrange(p,
+                        p+scale_fill_continuous(breaks=c(2000, 4000)),
+                        p+scale_fill_continuous(breaks=c(2000, 4000), labels=c('2k', '4k')),
+                        ncol=3)
+```
+
+
+```{r}
+data.frame(x=1:3, y=c('a', 'b', 'c')) -> df2
+
+ggplot(df2,
+       aes(x=x, y=y)) + 
+  geom_point() -> p
+
+gridExtra::grid.arrange(p,
+                        p+scale_y_discrete(labels=c('apple', 'banana', 'carrot')),
+                        ncol=2)
+```
+
+To suppress breaks set the breaks or labels to NULL
+
+```{r}
+ggplot(df,
+       aes(x=x, y=1)) +
+  geom_point() + 
+  labs(x=NULL, y=NULL) -> p
+
+gridExtra::grid.arrange(p+scale_x_continuous(breaks=NULL),
+                        p+scale_x_continuous(labels=NULL),
+                        ncol=2)
+```
+
+Both _breaks_ and _labels_ can take a function which takes 2 element vector with the lower and uppoer limits of the data and returns a vector of either the break points or the label names.
+
+The **scales** package has functions to adjust scales such as
+
+* scales::comma_format()
+* scales::unit_format(unit, scale)
+* scales::dollar_format(prefix, suffix)
+
+See the **scales** package.
+
+```{r}
+library(scales)
+
+gridExtra::grid.arrange(p+scale_y_continuous(labels=scales::percent_format()),
+                        p+scale_y_continuous(labels=scales::dollar_format('$')),
+                        p+scale_x_continuous(breaks=function(x){c(1000, 1853, 3543, 5000)}),
+                        ncol=2)
+```
+
+### Minor breaks
+
+Minor breaks are set with the minor_breaks parameter.  It takes a matrix with each row representingthe minor break points between the previous left most point and the current point.
+
+```{r}
+data.frame(x=c(2, 3, 5, 10, 200, 3000), y=1) -> df
+
+ggplot(df,
+       aes(x=x, y=y)) +
+  geom_point() + 
+  scale_x_log10() -> p1
+
+1:10 %o% 10 ^ (0:4) -> mb
+
+ggplot(df,
+       aes(x=x, y=y)) + 
+  geom_point() +
+  scale_x_log10(minor_breaks = mb) -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+## Legends
+
+Legends and axes are related but Legends are more complicated.  They include position, format, can be associated with multiple layers, etc.
+
+### Layers and Legends
+
+By default legends only appear if the aesthetic is mapped to a variable with aes() but it can be forced with _show.legend=TRUE_ or _show.legend=FALSE_ to hide it.
+
+```{r}
+
+data_frame(x=1:3, y=3:1, z=c('a', 'b', 'c')) -> df
+
+ggplot(df,
+        aes(x=x, y=y)) +
+  geom_point(size=4, 
+             colour='grey50') +
+  geom_point(aes(colour=z),
+             size=2) -> p1
+
+ggplot(df,
+       aes(x=x, y=y)) + 
+  geom_point(size=4,
+             colour='grey50',
+             show.legend=TRUE) +
+  geom_point(aes(colour=z),
+             size=2) -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+The override.aes parm can be used to override aesthetics of the legend which can be helpfulin certain cases.
+
+```{r}
+data_frame(x=rnorm(1000),
+           y=rnorm(1000)) -> norm
+cut(norm$x,
+    3,
+    labels=c('a', 'b', 'c')) -> norm$z
+
+ggplot(norm,
+       aes(x=x, y=y)) +
+  geom_point(aes(colour=z),
+             alpha=0.1) -> p1
+
+ggplot(norm,
+       aes(x=x, y=y)) +
+  geom_point(aes(colour=z),
+             alpha=0.1) +
+  guides(colour=guide_legend(override.aes=list(alpha=1))) -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+ggplot2 tries to create as few legends as possible.  If the same variable is mapped to different aesthetics they will be combined.
+
+In order for legends to merge they must have the same name.  If the name of the scale is changed for one it must be changed for all to allow them to merge.
+
+```{r}
+ggplot(df,
+       aes(x=x, y=y)) -> p
+
+gridExtra::grid.arrange(p + geom_point(aes(colour=z)),
+                        p + geom_point(aes(shape=z)),
+                        p + geom_point(aes(colour=z, shape=z)),
+                        ncol=3)
+```
+
+```{r}
+p + geom_point(aes(colour=z, shape=z)) -> pp
+
+gridExtra::grid.arrange(pp + guides(colour=guide_legend('Spoon')),
+                        pp + labs(shape='Fork'),
+                        pp + guides(shape=guide_legend('Knife')) + labs(colour='Knife'),
+                        ncol=3)
+```
+
+## Legend layout
+
+Legend layour is controlled with the theme() function.  The legend.position controls position
+
+```{r}
+ggplot(df,
+       aes(x=x, y=y)) + 
+  geom_point(aes(colour=z), 
+             size=3) +
+  labs(x=NULL, y=NULL) -> p
+
+gridExtra::grid.arrange(p+theme(legend.position='right'),
+                        p+theme(legend.position='bottom'),
+                        p+theme(legend.position='none'),
+                        p+theme(legend.position='left'),
+                        p+theme(legend.position='top'),
+                        p+theme(legend.position=c(0.5, 0.5)),
+                        ncol=3)
+```
+
+## Guide functions
+
+Guides can be overriden with the _guide_ parm of the corresponding scale function or with the _guides()_ helper function.
+
+```{r}
+data_frame(x=1, y=1:3, z=1:3) -> df
+
+ggplot(df,
+       aes(x=x, y=y)) +
+  geom_raster(aes(fill=z)) -> base
+
+gridExtra::grid.arrange(base,
+                        base+scale_fill_continuous(guide=guide_legend()),
+                        base+guides(fill=guide_legend()),
+                        ncol=3)
+```
+
+## Limits
+
+Sets the domain of the scale.  You may want to decrease the domain to focus on 1 area of a chart or increase it to make multiple charts appear at the same scale.
+
+Limits apply to size, such as with axes, but also apply to other scales like colour, size and shape and can be used to keep these consistent accross charts.
+
+Limits can be set with the _limits_ parm of the scale function.
+
+For continuous data it should always be a vector of 2 values indicating the upper and lower limits.
+
+For discrete data it should be a vector with all possible values.
+
+```{r}
+data_frame(x=1:3, y=1:3) -> df
+
+ggplot(df,
+       aes(x=x, y=y)) +
+  geom_point() -> base
+
+gridExtra::grid.arrange(base,
+                        base+scale_x_continuous(limits=c(1.5, 2.5)),
+                        base+scale_x_continuous(limits=c(0, 4)),
+                        ncol=3)
+```
+
+Because this is common, 3 helper functions exist
+
+* xlim() 
+* ylim()
+* limits()
+
+```{r}
+gridExtra::grid.arrange(base + xlim(0, 4),
+                        base + xlim(4, 0),
+                        base + lims(x=c(0,4)),
+                        ncol=3)
+```
+
+note that the chart area extends slightly past the specified limits.  This can be controled with the _expand=_ option.  To remove it set _expand=c(0, 0)_.  This can be useful for raster charts.
+
+```{r}
+ggplot(faithfuld,
+       aes(x=waiting, y=eruptions)) +
+  geom_raster(aes(fill=density)) +
+  theme(legend.position='none') -> p1
+
+p1 + scale_x_continuous(expand=c(0,0)) +
+  scale_y_continuous(expand=c(0,0)) -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+limits set any data values outside the limits to NA.  To "zoom" into the chart you need to use the _xlim_ and _ylim_ arguments to the _coord_cartesian()_ function.  This does a visual zoom vs. modifying the data.
+
+The behavior is set with the _oob_ argument of the scale_... function.  The default is scale::censor() which replaces with NA but scale::squish() can be used as well.
+
+```{r}
+data_frame(x=1:5) -> df
+ggplot(df,
+       aes(x, 1)) +
+  geom_tile(aes(fill=x), 
+            colour='white') -> p
+
+gridExtra::grid.arrange(p,
+                        p+scale_fill_gradient(limits=c(2,4)),
+                        p+scale_fill_gradient(limits=c(2,4), 
+                                              oob=scales::squish),
+                        ncol=3)
+```
+
+## Scales toolbox
+
+### Continuous position scales
+
+Continuous scale functions have a _transform_ argument which can be used to specify a transform such as:
+
+* asn
+* exp
+* log
+* pow10
+* reverse
+* ...
+
+Some common ones have special scale functions such as:
+
+* scale_x_log10()
+* scale_y_sqrt()
+* ...
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=hwy)) +
+  geom_point()+
+  scale_y_continuous(trans='reciprocal') -> p1
+
+ggplot(diamonds,
+       aes(x=price, y=carat)) +
+  geom_bin2d() +
+  scale_x_continuous(trans='log10') +
+  scale_y_log10() -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+### datetimes
+
+There are special scale_... functions for date times.  ggplot understands items of type Date and POSIXct.  Dates must be converted to these formats.
+
+The scale_x_date() and scale_x_datetime() functions have a couple additional arguments:
+
+* date_breaks - understands date breaks like '2 weeks', etc.
+* date_labels - works with standard date format strings (%Y, %m, %S, etc.)
+```{r}
+dplyr::glimpse(economics)
+```
+
+```{r}
+ggplot(economics,
+       aes(x=date, y=psavert)) +
+  geom_line(na.rm=TRUE) +
+  labs(x=NULL, y=NULL) -> base
+
+gridExtra::grid.arrange(base,
+                        base + scale_x_date(date_labels='%y',
+                                         date_breaks='5 years'),
+                        ncol=2)
+```
+```{r}
+gridExtra::grid.arrange(base+scale_x_date(limits=as.Date(c('2004-01-01', '2005-01-01')),
+                                          date_labels='%b %y',
+                                          date_minor_breaks='1 month'),
+                        base+scale_x_date(limits=as.Date(c('2004-01-01', '2004-06-01')),
+                                          date_labels='%m/%d',
+                                          date_minor_breaks='2 weeks'),
+                        ncol=2)
+```
+
+## Color
+
+### Continuous
+
+There are 4 continous color scales
+
+_scale_colour_gradient()_ and _scale_fill_gradient()_ - 2 colour grandient, high/low.  This is the default and the same as _scale_colour_continuous()_.
+
+Generally for continuous colours you want to keep the Hue constant and adjust the chroma and luminance.  The package _munsell_ has functions for specifying color this way.
+
+```{r fig.height=3}
+ggplot(faithfuld,
+       aes(x=waiting, y=eruptions, fill=density)) +
+  geom_raster() +
+  scale_x_continuous(name=NULL, expand=c(0,0)) +
+  scale_y_continuous(name=NULL, expand=c(0,0)) +
+  theme(legend.position='none') -> erupt
+
+gridExtra::grid.arrange(erupt,
+                        erupt+scale_fill_gradient(low='white', high='black'),
+                        erupt+scale_fill_gradient(low=munsell::mnsl('5G 9/2'),
+                                                  high=munsell::mnsl('5G 6/8')),
+                        ncol=3)
+```
+
+_scale_colour_gradient2()_ and _scale_fill_gradient2()_ - 3 color gradient (low-med-high).
+
+These have a _midpoint_ argument which is normally 0 andrepresents the mid-point of values.  The normal colour range is red-white-blue.
+
+```{r fig.height=3}
+median(faithfuld$density) -> mid
+erupt + scale_fill_gradient2(midpoint=mid)
+```
+
+_scale_colour_gradientn()_ and _scale_fill_gradientn()_ allow for coustom n-colour pallette to be set.
+
+See the _colourspace_ package for some color palettes.
+
+```{r fig.height=3}
+gridExtra::grid.arrange(erupt+scale_fill_gradientn(colours=terrain.colors(7)),
+                        erupt+scale_fill_gradientn(colours=colorspace::heat_hcl(7)),
+                        erupt+scale_fill_gradientn(colours=colorspace::diverge_hcl(7)),
+                        ncol=3)
+```
+
+_scale_colour_distiller()_ and __scale_fill_distiller_scale_fill_gradient()_ applly Color-Brewer color scales to continuous data.  They act like _scale_fill_brewer()_
+
+```{r}
+gridExtra::grid.arrange(erupt+scale_fill_distiller(),
+                        erupt+scale_fill_distiller(palette='RdPu'),
+                        erupt+scale_fill_distiller(palette='YlOrBr'),
+                        ncol=3)
+```
+
+The _na.value_ argument can be used to hide (na.value=NA) or change (na.value='color') the default (gray) color.
+
+```{r}
+data_frame(x=1, y=1:5, z=c(1,3,2,NA,5)) -> df
+
+ggplot(df,
+       aes(x=x, y=y)) +
+  geom_tile(aes(fill=z), size=5) -> p
+
+gridExtra::grid.arrange(p,
+                        p+scale_fill_gradient(na.value=NA),
+                        p+scale_fill_gradient(low='black', high='white', na.value='red'),
+                        ncol=3)
+```
+
+### Discrete colors
+
+

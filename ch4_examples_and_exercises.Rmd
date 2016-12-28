@@ -1,0 +1,133 @@
+---
+title: "ggplot2 - Chapter 4 Examples and Excersizes"
+output:
+  pdf_document:
+    toc: yes
+  html_notebook: default
+  html_document:
+    theme: united
+    toc: yes
+---
+
+his is a notebook of the examples and excersizes from "ggplot2 Elegant Graphics for Data Analysis"
+
+```{r}
+library(tidyverse)
+library(gridExtra)
+```
+
+# Chapter 4
+
+## Building a scatterplot
+### Mapping aesthetics to data
+
+**aesthetics** are the attributes which describe a chart.
+
+See the `vignett("ggplot2-specs")` for colory, size, line-type and font values.
+
+In the example below the aesthetics applied are to set _displ_ to the _x axis_, _hwy_ to the _y axis_ and set a different color for each _cyl_ value as a factor.  The result is a dataset that looks like:
+
+
+```{r}
+select(mpg, x=displ, y=hwy, colour=cyl) %>%
+  head()
+```
+
+This new dataset can then be drawn as any chart type, although some may not make sense.
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=hwy, colour=factor(cyl))) +
+  theme(legend.position='none') -> p
+
+gridExtra::grid.arrange(p + geom_point(),
+                        p + geom_line(),
+                        p + geom_bar(stat='identity', position='identity', fill=NA),
+                        ncol=3)
+```
+
+Graphs are made up of _geometric shapes_ or _geoms_.  Some special sinlge geom charts exist like scatterplot, bubble chart, line chart, etc.  Other more complex don't have single names and are described individually.
+
+An example is a scatter plot of data with a per group regression line through each group.
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=hwy, colour=factor(cyl))) + 
+  geom_point() +
+  geom_smooth(method='lm')
+```
+
+### Scaling
+
+The x and y values have to be "scaled" so R and the graphics enging (grid) can plot them.  By default the values are mapped to a value between [0,1].  The underlying **coord** system takes care of mapping that to the appropriate pixel on the output device.
+
+Colors are mapped to a 6 hex digit value that cooresponds to a screen color.
+
+For the example above the dataset to map would include the default size (1) and shape (19 - filled ciricle) and default assigned color.  Soemthing like:
+
+```{r}
+ds = dplyr::select(mpg, x=displ, y=hwy, colour=cyl)
+ds$size = 1
+ds$shape = 19
+
+ds[ds$colour == 4, 'colour'] = '#F12345'
+ds[ds$colour == 5, 'colour'] = '#F23456'
+ds[ds$colour == 6, 'colour'] = '#F34567'
+ds[ds$colour == 8, 'colour'] = '#F45678'
+
+head(ds)
+```
+
+Now for a more complicated example
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=hwy)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~year)
+```
+
+This is an example with multiple layers (points and smooth lines), statistics (the smooth line).
+
+### Scaling happens in 3 parts
+
+* Transform
+* Train
+* Map
+
+Scale transformations occur before statistical transformations so stats are calculated on transformed data.
+
+## components of layered graphics
+
+1. Default dataset and aesthetic mappings
+2. One or more layers composed of a geom, a statistical transformation, position adjustment and optionally a dataset and aesthetic mappings.
+3. One scale for each aesthetic mapping.
+4. A coordinate system.
+5. The facetting specification
+
+### Layers
+
+5 components to layers
+
+1. Data
+2. Aesthetic mappings
+3. A statistical transformation (stat)
+4. A geom
+5. A postition adjustment
+
+### Scales
+
+A scale is requried for each aesthetic used on a plot.  This controlls mapping form aesthtic to data.
+
+### Coordinate System
+
+Controls how points are mapped to the output device, usually by (x, y) pairs but there could be more (ggplot does not support more than 2 dimentions)  There are 2 commonly used coordinate systems, Cartesian and Polar. 
+
+The coordinate system can modify the look of the geom.  i.e. a bar in a bar chart looks like a segment of a circle in polar coordinates.
+
+### Facetting
+
+Break out into multiple charts by some factor(s)
+
+

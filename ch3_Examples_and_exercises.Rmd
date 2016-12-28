@@ -1,6 +1,13 @@
 ---
-title: "ggplot2 - Examples and Excersizes"
-output: html_notebook
+title: "ggplot2 - Chapter 3 Examples and Excersizes"
+output:
+  html_document: 
+    toc: true
+    theme: united
+  html_notebook: default
+  pdf_document: 
+    toc: true
+    theme: united
 ---
 
 This is a notebook of the examples and excersizes from "ggplot2 Elegant Graphics for Data Analysis"
@@ -564,6 +571,7 @@ download.file('http://www2.census.gov/geo/tiger/GENZ2015/shp/cb_2015_us_nation_5
 Unziped file manually
 
 ```{r}
+library(maptools)
 readShapeSpatial('cb_2015_us_nation_5m.shp') -> ussp
 ```
 
@@ -773,6 +781,232 @@ grid.arrange(p1, p2, ncol=2)
 
 ## 3.10 Diamonds data
 
+Use binwidth to find the best view of the data.
+Use things like xlim() to limit the x axis range to focus in on a key area.
+
+```{r}
+ggplot(diamonds, 
+       aes(depth)) +
+  geom_histogram() -> p1
+
+ggplot(diamonds,
+       aes(depth)) +
+  geom_histogram(binwidth=0.1) +
+  xlim(55, 70) -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+Setting position='fill' for the geom_histogram causes the use of the density value instead of straight count.  This is the number of items at that point / total count of itmes * binwidth.
+
+```{r}
+ggplot(diamonds,
+       aes(depth)) +
+  geom_freqpoly(aes(colour=cut),
+                binwidth=0.1,
+                na.rm=TRUE) +
+  xlim(58, 68) +
+  theme(legend.position='none') -> p1
+
+ggplot(diamonds,
+       aes(depth)) +
+  geom_histogram(aes(fill=cut),
+                 binwidth=0.1,
+                 position='fill',
+                 na.rm=TRUE) +
+  xlim(58, 68) +
+  theme(legend.position='none') -> p2
+
+ggplot(diamonds,
+       aes(depth)) +
+  geom_histogram(aes(fill=cut),
+                 binwidth=0.1,
+                 na.rm=TRUE) +
+  xlim(58, 68) +
+  theme(legend.position='none') -> p3
+
+gridExtra::grid.arrange(p1, p2, p3, ncol=2)
+```
+
+```{r}
+ggplot(diamonds,
+       aes(x=depth)) +
+  geom_density(na.rm=TRUE) +
+  xlim(58, 68) + 
+  theme(legend.position='none') -> p1
+
+ggplot(diamonds,
+       aes(x=depth,
+           fill=cut,
+           colour=cut)) +
+  geom_density(alpha=0.2,
+               na.rm=TRUE) +
+  xlim(58, 68) +
+  theme(legend.position='none') -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+## boxplot
+
+```{r}
+ggplot(diamonds,
+       aes(clarity, depth)) +
+  geom_boxplot() -> p1
+
+ggplot(diamonds,
+       aes(carat, depth)) +
+  geom_boxplot(aes(group=cut_width(carat, 0.1))) +
+  xlim(NA, 2.05) -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+## violin plot
+
+```{r}
+ggplot(diamonds,
+       aes(clarity, depth)) +
+  geom_violin() -> p1
+
+ggplot(diamonds,
+       aes(carat, depth)) +
+  geom_violin(aes(group=cut_width(carat, 0.1))) + 
+  xlim(NA, 2.05) -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+## Excersizes
+
+* What binwidth tells most ineresting story about distribution of carat?
+
+0.01 - Shows a repeated downward slope between whole values.
+
+```{r}
+ggplot(diamonds,
+       aes(x=carat)) + 
+  geom_histogram() -> p1
+
+ggplot(diamonds,
+       aes(x=carat)) +
+  geom_histogram(binwidth=0.1) -> p2
+
+ggplot(diamonds,
+       aes(x=carat)) +
+  geom_histogram(binwidth=0.01) -> p3
+
+gridExtra::grid.arrange(p1, p2, p3, ncol=2)
+```
+
+### Draw a historgram of price.
+### What interesting patters do you see?  There is a bump in the data between 4-5K.
+
+```{r}
+ggplot(diamonds,
+       aes(x=price)) +
+  geom_histogram() -> p1
+
+ggplot(diamonds,
+       aes(x=price)) +
+  geom_histogram(binwidth=100) -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+### How does distribution of price vary with clarity?
+
+```{r}
+ggplot(diamonds,
+       aes(x=price, colour=clarity, fill=clarity)) +
+  geom_density(alpha=0.2)  -> p1
+
+
+gridExtra::grid.arrange(p1, ncol=2)
+```
+
+## Overplotting
+
+When using a scatter plot points may fall on each other obscuring the actual data making it hard to determine anything from the data.  Some approaches to address this are:
+
+Change size or type of point to show data.
+
+```{r}
+data.frame(x=rnorm(2000),
+           y=rnorm(2000)) -> df
+
+ggplot(df,
+       aes(x=x, y=y)) +
+  xlab(NULL) + ylab(NULL) -> norm
+
+gridExtra::grid.arrange(norm + geom_point(),
+                        norm + geom_point(shape=1),
+                        norm + geom_point(shape='.'),
+                        ncol=3)
+```
+
+Change the gransparancy of the points so that overlapping will show darker.
+
+```{r}
+gridExtra::grid.arrange(norm + geom_point(alpha=1/3),
+                        norm + geom_point(alpha=1/5),
+                        norm + geom_point(alpha=1/10),
+                        ncol=3)
+```
+
+Another approach is to 'bin' points in certain arias and plot the density with colour.
+
+```{r}
+gridExtra::grid.arrange(norm + geom_bin2d(),
+                        norm + geom_bin2d(bins=10),
+                        ncol=2)
+```
+
+Squares from the geom_bin2d aren't very visually appealing, using geom_hex from the hexbin package makes nicer images
+
+```{r}
+library(hexbin)
+
+gridExtra::grid.arrange(norm + geom_hex(),
+                        norm + geom_hex(bins=10),
+                        ncol=2)
+```
+
+
+## Statistical Summaries
+
+```{r}
+ggplot(diamonds,
+       aes(color)) + 
+  geom_bar() -> p1
+
+ggplot(diamonds,
+       aes(color, price)) +
+  geom_bar(stat='summary_bin',
+           fun.y=mean) -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+```{r}
+ggplot(diamonds,
+       aes(x=table, y=depth)) +
+  geom_bin2d(binwidth=1, na.rm=TRUE) +
+  xlim(50, 70) + 
+  ylim(50, 70) -> p1
+
+ggplot(diamonds,
+       aes(x=table, y=depth, z=price)) +
+  geom_raster(binwidth=1, 
+              stat='summary_2d', 
+              fun=mean,
+              na.rm=TRUE) +
+  xlim(50, 70) + 
+  ylim(50, 70) -> p2
+
+p1
+p2
+```
 
 
 

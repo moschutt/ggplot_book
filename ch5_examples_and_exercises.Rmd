@@ -1,0 +1,302 @@
+---
+title: "ggplot2 - Chapter 5 Examples and Excersizes"
+output:
+  pdf_document:
+    toc: yes
+  html_notebook: default
+  html_document:
+    theme: united
+    toc: yes
+---
+
+his is a notebook of the examples and excersizes from "ggplot2 Elegant Graphics for Data Analysis"
+
+```{r}
+library(tidyverse)
+library(gridExtra)
+```
+
+# Building a plot
+
+All plots start with ggplot.
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=hwy)) -> p
+
+p
+```
+
+Nothing to see, but note the indexes are set and the axis are named.
+
+To create a plot, add a geom layer
+
+```{r}
+p + geom_point()
+```
+
+geom_point is a short-cut.  geom_point actually calls _layer()_ to create a layer.
+
+```{r}
+p + layer(
+  mapping=NULL,
+  data=NULL,
+  geom='point',
+  stat='identity',
+  params=list(na.rm = FALSE),
+  position='identity')
+```
+
+This call specifies the 5 components of a layer
+
+1. mapping - aesthetic mappings
+2. data - the data
+3. geom - what geom to plot.  All geoms take aesthetics as parms.  Specifying an aesthetic as a parm, i.e. colour=..., it is **NOT** scaled giving additional control over the appearance.
+4. stat - name of statistical transformation to use.
+5. position - method used to adjust overlapping objects.
+
+## Data
+
+Every layer must have some data and that data must be _tidy_.
+
+Each layer may have it's own data.
+
+```{r}
+loess(hwy ~ displ,
+      data=mpg) -> mod
+data_frame(displ=seq(min(mpg$displ),
+                     max(mpg$displ),
+                     length=50)) -> grid
+predict(mod,
+        newdata=grid) -> grid$hwy
+
+grid
+```
+
+```{r}
+resid(mod) / mod$s -> std_resid
+filter(mpg,
+       abs(std_resid) > 2) -> outlier
+
+outlier
+```
+
+These manufactured datasets can be used to augment the original chart with smooth lines and labels.
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=hwy)) +
+  geom_point() +
+  geom_line(data=grid,
+            colour='blue',
+            size=1.5) +
+  geom_text(data=outlier,
+            aes(label=model))
+```
+
+In the above chart the default data was used by the first (geom_point) geom and the default mapping was used by geom_point and geom_line, wheras the geom_text added the label= to the aesthetics.
+
+This could have also been written with each layer specifying their own data.
+
+```{r}
+ggplot(mapping=aes(x=displ, y=hwy)) +
+  geom_point(data=mpg) +
+  geom_line(data=grid,
+            colour='blue',
+            size=1.5) +
+  geom_text(data=outlier,
+            aes(label=model))
+```
+
+## Aesthetic Mappings
+
+Some things to not do are complex calculations in the aes() function call.  These are performed every time the chart is created.
+
+Also do not reference variables with **$** as this can break things later.
+
+## Specifying aesthetics in plot vs. gom.
+
+You can add  or augment aesthstics as required in any layer.  But how you do it will affect the outcome of the final chart.  Ex..
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=hwy, colour=class)) +
+  geom_point() +
+  geom_smooth(method='lm', se=FALSE) +
+  theme(legend.position='none') -> p1
+
+ggplot(mpg,
+       aes(x=displ, y=hwy)) +
+  geom_point(aes(colour=class)) +
+  geom_smooth(method='lm', se=FALSE) +
+  theme(legend.position='none') -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+## Setting vs. Mapping
+
+To have the appearance governed by a variable, put it in the aes() otherwise put it outside to override, i.e. the color or size.
+
+```{r}
+ggplot(mpg,
+       aes(x=cty, y=hwy)) +
+  geom_point(colour='darkblue') -> p1
+
+ggplot(mpg,
+       aes(x=cty, y=hwy)) +
+  geom_point(aes(colour='darkblue')) -> p2
+
+gridExtra::grid.arrange(p1, p2, p1 + scale_colour_identity(), ncol=2)
+```
+
+The first chart sets the colour of each point to "darkblue", the second creates a new variable and sets it to the value darkblue then sets the colour based on it's value.
+
+**scale_colour_identity()** makes the value in the variable passed into the aes() call the scaled value to represent.  In this case, the color to present.
+
+Another use for mapping constants to aesthetics is to "name" layers, as in
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=hwy)) +
+  geom_point() +
+  geom_smooth(aes(colour='loess'), 
+              method='loess',
+              se=FALSE) +
+  geom_smooth(aes(colour='lm'),
+              method='lm',
+              se=FALSE) +
+  labs(colour='Method')
+```
+
+## Geoms
+
+## Stats
+
+Most stat functions are never called directly but used to create the stats for geoms, such as stat_boxplot(), stat_bin(), stat_smooth(), etc.  There are some which do not have associated geoms:
+
+* stat_ecdf()
+* stat_function()
+* stat_summary()
+* stat_summary2d(), stat_summary_hex()
+* stat_qq()
+* stat_spoke()
+* stat_unique()
+
+There are 2 ways to use these, either using the stat_.. function and indicating the geom or using the geom_... function and indicating the stat.
+
+```{r}
+ggplot(mpg,
+       aes(trans, cty)) +
+  geom_point() +
+  stat_summary(geom='point', 
+               fun.y='mean',
+               colour='red',
+               size=4) -> p1
+
+ggplot(mpg,
+       aes(trans, cty)) +
+  geom_point() +
+  geom_point(stat='summary',
+             fun.y='mean',
+             colour='red',
+             size=4) -> p2
+
+ggplot(mpg,
+       aes(trans, cty)) +
+  geom_point() +
+  geom_point(stat='summary',
+             fun.y=function(x) {mean(x)},
+             colour='red',
+             size=4) -> p3
+
+gridExtra::grid.arrange(p1, p2, p3, ncol=2)
+```
+
+Note that function can be a string, named function, which must exist and take a single parameter.  Or it can be a lambda function which takes a vector argument.
+
+## Generated variables
+
+The stat_... functions take a data.frame and return a data.frame with possible additional variables.  i.e. the stat_bin stat adds count, number of items in each bin, density, the % total / bar width adn x the center of the bin.  These generated varables can be used in the aesthetic but must be surrounded by .. to distinguisn from possible variables of the same name in the original data.
+
+For geom_histogram() the default y is count but can be updated to density with y=..density..
+
+```{r}
+ggplot(diamonds,
+       aes(x=price)) +
+  geom_histogram(binwidth=500) -> p1
+
+ggplot(diamonds,
+       aes(x=price)) +
+  geom_histogram(aes(y=..density..),
+                 binwidth=500) -> p2
+
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+```{r}
+ggplot(diamonds,
+       aes(x=price, colour=cut)) +
+  geom_freqpoly(binwidth=500) +
+  theme(legend.position='bottom') -> p1
+
+ggplot(diamonds,
+       aes(x=price, colour=cut)) +
+  geom_freqpoly(aes(y=..density..),
+                binwidth=500) +
+  theme(legend.position='bottom') -> p2
+
+gridExtra::grid.arrange(p1, p2, ncol=2)
+```
+
+## Position adjustments
+
+* position_stack() - stack items
+* position_fill() - stack with top at 1
+* position_dodge() - place overlapping boxes side by side.
+
+```{r}
+ggplot(diamonds,
+       aes(x=color, fill=cut)) +
+  xlab(NULL) + ylab(NULL) + theme(legend.position='none') -> p
+
+gridExtra::grid.arrange(p + geom_bar(), 
+                        p + geom_bar(position='fill'),
+                        p + geom_bar(position='dodge'),
+                        ncol=2)
+```
+
+geom_identity() makes no adjustments, whcih can be used to over-ride a default like for stacking for bar.
+
+```{r}
+gridExtra::grid.arrange(p + geom_bar(position='identity',
+                                     alpha=1/2,
+                                     colour='grey50'),
+                        p + geom_freqpoly(aes(group=cut, colour=cut),
+                                          stat='count'),
+                        ncol=2)
+```
+
+Specifying position='identity' overlayed the bars.
+
+* position_nudge() - moves points by a fixed offest
+* position_jitter() - adds a little random noise to the position
+* position_gitterdodge() - dodge points within groups then add noise
+
+For these, which require parameters, you call them a bit differently.
+
+An alternate way to call is using geom_jitter()
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=hwy)) -> p
+
+gridExtra::grid.arrange(p + geom_point(),
+                        p + geom_point(position='jitter'),
+                        p + geom_point(position=position_jitter(width=0.5, height=0.5)),
+                        p + geom_jitter(width=0.5, height=0.5),
+                        ncol=2)
+```
+
+
