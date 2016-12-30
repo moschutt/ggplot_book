@@ -438,6 +438,11 @@ Requires: DBI, broom, dplyr, forcats, ggplot2, haven, hms, httr,
     jsonlite, lubridate, magrittr, modelr, purrr, readr, readxl, rvest,
     stringr, tibble, tidyr, xml2
 
+Package: wesanderson
+Source: CRAN
+Version: 0.3.2
+Hash: ef5f6994d0a579b6c3bcf90b184068d2
+
 Package: xml2
 Source: CRAN
 Version: 1.0.0

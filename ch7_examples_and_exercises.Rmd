@@ -1,0 +1,401 @@
+---
+title: "ggplot2 - Chapter 7 Examples and Excersizes"
+output:
+  pdf_document:
+    toc: yes
+  html_notebook: default
+  html_document:
+    theme: united
+    toc: yes
+  word_document:
+    toc: yes
+---
+
+his is a notebook of the examples and excersizes from "ggplot2 Elegant Graphics for Data Analysis"
+
+```{r}
+library(tidyverse)
+library(gridExtra)
+```
+
+# Positioning
+
+## faceting
+
+3 faceting functions
+
+* facet_null() - defalt 1 chart
+* facet_wrap()
+* facet_grid()
+
+```{r}
+subset(mpg,
+       cyl != 5 & drv %in% c('4', 'f') & class != '2seater') -> mpg2
+
+ggplot(mpg2,
+       aes(x=displ, y=hwy)) +
+  geom_blank() + 
+  labs(x=NULL, y=NULL) -> pb
+
+gridExtra::grid.arrange(pb + facet_wrap(~ class, ncol=3),
+                        pb + facet_wrap(~ class, 
+                                        ncol=3,
+                                        as.table=FALSE),
+                        ncol=2)
+```
+
+```{r}
+gridExtra::grid.arrange(pb + facet_wrap(~ class, nrow=3),
+                        pb + facet_wrap(~ class,
+                                        nrow=3,
+                                        dir='v'),
+                        ncol=2)
+```
+
+### facet grid
+
+. ~ <var> spreads items accross colums
+
+```{r}
+pb + facet_grid(. ~ cyl)
+```
+
+<var> ~ . spreads items down rows
+
+```{r}
+pb + facet_grid(drv ~ .)
+```
+
+<var> ~ <var> spreads accross columns and down rows
+
+```{r}
+pb + facet_grid(drv ~ cyl)
+```
+
+Multiple values can be used in the formula by "adding" them (+).
+
+### Controlling scales
+
+by default scales for charts are "fixed" at the values for the largest range.  There are 4 options, however.
+
+* scales='fixed' (default)
+* scales='free_x' - X scales are relative to data in that chart
+* scales='free_y' - Y scales are relative to data in that chart
+* scales='free' - Both X and Y are relatove to the data.
+
+_facet_grid()_ has the constraint that all charts in a row have the same y scale and all charts in a column have the same x scale.
+
+Fixed scales make it easier to see relations betwen charts.  Free scales make it easier to see details of each chaart.
+
+```{r}
+ggplot(mpg2,
+       aes(x=cty, y=hwy)) + 
+  geom_abline() +
+  geom_jitter(width=0.1, height=0.1) -> p
+
+gridExtra::grid.arrange(p + facet_wrap(~cyl),
+                        p + facet_wrap(~cyl, scales='free'),
+                        nrow=2)
+```
+
+free scales are also good for time series with different scales.  First, make data long.
+
+```{r}
+economics_long
+```
+
+```{r}
+ggplot(economics_long,
+       aes(x=date, y=value)) + 
+  geom_line() + 
+  facet_wrap(~variable, scales='free_y', ncol=1)
+```
+
+_facet_grid()_ has an additional parameter, _space_, which has same values as scales and controls how much of the available space each chart will get.
+
+```{r}
+reorder(mpg2$model, mpg2$cty) -> mpg2$model
+reorder(mpg2$manufacturer, -mpg2$cty) -> mpg2$manufacturer
+
+ggplot(mpg2, 
+       aes(x=cty, y=model)) +
+  geom_point() + 
+  facet_grid(manufacturer ~ ., 
+             scales='free',
+             space='free') + 
+  theme(strip.text.y = element_text(angle=0))
+```
+
+### Missing faceting variables
+
+It displays in every facet.
+
+```{r}
+data_frame(x=1:3, y=1:3, gender=c('f', 'f', 'm')) -> df1
+data_frame(x=2, y=2) -> df2
+
+ggplot(df1,
+       aes(x=x, y=y)) +
+  geom_point(data=df2,
+             colour='red',
+             size=2) +
+  geom_point() + 
+  facet_wrap(~gender)
+```
+
+### Grouping vs. faceting
+
+Faceting is a form of grouping.  Faceting has advantages in that each group is clear but disadvantage in seeing small differences betweengroups.
+
+```{r}
+data.frame(
+  x=rnorm(120, c(0, 2, 4)),
+  y=rnorm(120, c(1, 2, 1)),
+  z = letters[1:3]) -> df
+
+ggplot(df,
+       aes(x=x, y=y)) +
+  geom_point(aes(colour=z))
+```
+
+```{r}
+ggplot(df,
+       aes(x=x, y=y)) +
+  geom_point() +
+  facet_wrap(~z)
+```
+
+Comparisons betweenfacets can often be aided by thoughtful annotations such as adding the mean of each group to each facet.
+
+```{r}
+library(wesanderson)
+
+group_by(df, z) %>%
+  summarize(x=mean(x), y=mean(y)) %>%
+  rename(z2=z) -> df_sum
+
+ggplot(df,
+       aes(x=x, y=y)) +
+  geom_point() +
+  geom_point(data=df_sum,
+             aes(colour=z2),
+             size=4) + 
+  scale_colour_manual(name='z means',
+                      values=wes_palette('GrandBudapest')) +
+  facet_wrap(~z)
+```
+
+Another approach is to put all the data in the background in a subdued color.
+
+```{r}
+select(df, -z) -> df2
+
+ggplot(df,
+       aes(x=x, y=y)) +
+  geom_point(data=df2, 
+             aes(x=x, y=y)) +
+  geom_point(aes(colour=z)) + 
+  scale_colour_manual(name='z values',
+                      values=wes_palette('Moonrise2')) +
+  facet_wrap(~z)
+```
+
+### Continuous variables
+
+To facet continuous variables they must first be "discretised".  There are 2 ggplot2 functions available for this
+
+* cut_interval(x, n) - devides data into n bins of the same length (relative to data range).
+* cut_width(x, width) - devices data into bins with width items in each.
+* cut_number(x, n = 10) - devices data into n bins of about the same number of items.
+
+```{r}
+cut_width(mpg2$displ, 1) -> mpg2$disp_w
+cut_interval(mpg2$displ, 6) -> mpg2$disp_i
+cut_number(mpg2$displ, 6) -> mpg2$disp_n
+
+mpg2
+```
+
+```{r fig.width=8, fig.height=3}
+ggplot(mpg2,
+       aes(x=cty, y=hwy)) +
+  geom_point() +
+  labs(x=NULL, y=NULL) -> plot
+
+plot + facet_wrap(~disp_w, nrow=1)
+```
+```{r fig.width=8, fig.height=3}
+plot + facet_wrap(~disp_i, nrow=1)
+```
+```{r fig.width=8, fig.height=3}
+plot + facet_wrap(~disp_n, nrow=1)
+```
+
+## Coordinate systems
+
+There are 2 types of coordinate systems, linear and non-linear.  Linear include:
+
+* coord_cartesian()
+* coord_flip()
+* coord_fixed()
+
+Non-linear include:
+
+* coord_map()/coord_quickmap()
+* coord_polar()
+* coord_trans()
+
+### Zooming into a plot with coord_cartesian
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=hwy)) +
+  geom_point() +
+  geom_smooth() -> base
+
+gridExtra::grid.arrange(base, 
+                        base + scale_x_continuous(limits=c(5,7)),
+                        base + coord_cartesian(xlim=c(5,7)),
+                        ncol=3)
+```
+
+### Flipping the axes with coord_flip()
+
+```{r}
+ggplot(mpg,
+       aes(x=displ, y=cty)) +
+  geom_point() +
+  geom_smooth() -> p1
+
+ggplot(mpg,
+       aes(x=cty, y=displ)) +
+  geom_point() +
+  geom_smooth() -> p2
+
+gridExtra::grid.arrange(p1, p2, p1 + coord_flip(), ncol=2)
+```
+
+## Non-linear coordinate systems
+
+```{r}
+data_frame(x=50, y=50) -> rect
+data_frame(x=c(1,200), y=c(100,1)) -> line
+
+ggplot(mapping=aes(x=x, y=y)) +
+  geom_tile(data=rect, aes(width=50, height=50)) + 
+  geom_line(data=line) +
+  labs(x=NULL, y=NULL) -> base
+
+gridExtra::grid.arrange(base, 
+                        base+coord_polar('x'),
+                        base+coord_polar('y'),
+                        ncol=3)
+```
+
+```{r}
+gridExtra::grid.arrange(base + coord_flip(),
+                        base + coord_trans(y='log10'),
+                        base + coord_fixed(),
+                        ncol=3)
+```
+
+### Transformations with coord_trans()
+
+scale transform happens before statistics are applied and do not affecdt the shape of the geom.  coord transforms occur after statistics are applied and do.  So you can apply a transform at the scale level then use coord_trans to backtransform it for interpretation.
+
+```{r}
+ggplot(diamonds,
+       aes(carat, price)) +
+  stat_bin2d() +
+  geom_smooth(method='lm') + 
+  labs(x=NULL, y=NULL) +
+  theme(legend.position='none') -> base
+
+base + 
+  scale_x_log10() +
+  scale_y_log10() -> base_log10
+
+scales::exp_trans(10) -> pow10
+
+
+gridExtra::grid.arrange(base,
+                        base_log10,
+                        base_log10 + coord_trans(x=pow10, y=pow10),
+                        ncol=3)
+```
+
+### Polar coords with coord_polar()
+
+Turning bar chart into pie or bullseye charts
+
+```{r fig.width=8, fig.height=3}
+ggplot(mtcars,
+       aes(x=factor(1), fill=factor(cyl))) +
+  geom_bar(width=1) +
+  theme(legend.position='none') +
+  scale_x_discrete(NULL, expand=c(0,0)) + 
+  scale_y_continuous(NULL, expand=c(0,0)) -> base
+
+gridExtra::grid.arrange(base + ggtitle('stacked bar'),
+                        base + coord_polar(theta='y') + ggtitle('pieified bar chart'),
+                        base + coord_polar() + ggtitle('bullseyeified bar chart'),
+                        ncol=3)
+```
+
+Interesting affect when x is not a single value
+
+```{r fig.width=8, fig.height=3}
+ggplot(mtcars,
+       aes(x=factor(carb), fill=factor(cyl))) +
+  geom_bar(width=1) +
+  theme(legend.position='none') +
+  scale_x_discrete(NULL, expand=c(0,0)) + 
+  scale_y_continuous(NULL, expand=c(0,0)) -> base
+
+gridExtra::grid.arrange(base + ggtitle('stacked bar'),
+                        base + coord_polar(theta='y') + ggtitle('pieified bar chart'),
+                        base + coord_polar() + ggtitle('bullseyeified bar chart'),
+                        ncol=3)
+```
+
+### Map projections with coord_map()
+
+maps are intrisically printed on a sphere and must be adjusted.  There are 2 ways to do this with ggplot2.
+
+```{r fig.width=8, fig.height=3}
+ggplot(map_data('nz'),
+       aes(x=long,
+           y=lat,
+           group=group)) +
+  geom_polygon(fill='white',
+               colour='black') + 
+  labs(x=NULL, y=NULL) -> nzmap
+
+gridExtra::grid.arrange(nzmap,
+                        nzmap + coord_quickmap(),
+                        ncol=2)
+```
+
+coord_map() uses the **mapproj** package to project the map.
+
+```{r}
+map_data('world') -> world
+ggplot(world,
+       aes(x=long,
+           y=lat,
+           group=group)) +
+  geom_path() + 
+  scale_y_continuous(name=NULL,
+                     breaks=(-2:3) * 30, labels=NULL) +
+  scale_x_continuous(name=NULL,
+                     breaks=(-4:4) * 45, labels=NULL) -> world
+
+gridExtra::grid.arrange(world, 
+                        world+coord_map(),
+                        world+coord_map('ortho'),
+                        world+coord_map('stereographic'),
+                        ncol=2)
+```
+
+
+
